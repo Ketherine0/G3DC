@@ -97,16 +97,6 @@ class DEC(nn.Module):
         x = self.autoencoder.encode(x)
         return self.clusteringlayer(x)
 
-    def visualize(self, epoch, x):
-        fig = plt.figure()
-        ax = plt.subplot(111)
-        x = self.autoencoder.encode(x).detach()
-        x = x.numpy()
-        x_embedded = TSNE(n_components=2).fit_transform(x)
-        plt.scatter(x_embedded[:, 0], x_embedded[:, 1])
-        fig.savefig('plots_test/mnist_{}.png'.format(epoch))
-        plt.close(fig)
-
 
 class MyLoss(nn.Module):
     def __init__(self, l1, l2, L):
@@ -241,7 +231,7 @@ def train(**kwargs):
 
         if epoch % 10 == 0:
             W1 = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
-            np.savetxt('%s %s %s' % ('model_weight/usoskin_weight/layer_weight/W2', epoch, '.txt'), W1.cpu().detach().numpy())
+            np.savetxt('%s %s %s' % ('../model_weight/usoskin_weight/layer_weight/W2', epoch, '.txt'), W1.cpu().detach().numpy())
         # output of target distribution
         target = model.target_distribution(output).detach()
         out = output.argmax(1)
@@ -291,7 +281,7 @@ def train(**kwargs):
             is_best)
 
     df = pd.DataFrame(row, columns=['epochs', 'accuracy','NMI','ARI'])
-    df.to_csv('usoskin_W/log_acc.csv')
+    df.to_csv('../model_weight/usoskin_weight/path/log_acc.csv')
 
 
 
@@ -309,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=610, type=int)
     parser.add_argument('--pretrain_epochs', default=300, type=int)
     parser.add_argument('--train_epochs', default=40, type=int)
-    parser.add_argument('--save_dir', default='model_weight/usoskin_weight/path')
+    parser.add_argument('--save_dir', default='../model_weight/usoskin_weight/path')
     args = parser.parse_args()
 
     print(args)
@@ -317,7 +307,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
 
     autoencoder = AutoEncoder().to(device)
-    ae_save_path = 'model_weight/usoskin_weight/path/sim_autoencoder3.pth'
+    ae_save_path = '../model_weight/usoskin_weight/path/sim_autoencoder3.pth'
 
     if os.path.isfile(ae_save_path):
         print('Loading {}'.format(ae_save_path))
@@ -331,7 +321,7 @@ if __name__ == '__main__':
         }
     pretrain(data=x, model=autoencoder, num_epochs=epochs_pre, savepath=ae_save_path, checkpoint=checkpoint)
 
-    dec_save_path = 'model_weight/usoskin_weight/path/dec6.pth'
+    dec_save_path = '../model_weight/usoskin_weight/path/dec6.pth'
     dec = DEC(n_clusters=4, autoencoder=autoencoder, hidden=64, cluster_centers=None, alpha=1.0).to(device)
     if os.path.isfile(dec_save_path):
         print('Loading {}'.format(dec_save_path))
