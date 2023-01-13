@@ -30,10 +30,10 @@ def normalize_adj(adj, symmetric=True):
 def load_data(path1,path2,path3):
     # X -------------------------------------
     d = pd.read_csv(path1)
-    gene_name = d.iloc[:,1]
+    gene_name = d.iloc[:,0]
 
 
-    X_df = d.iloc[:,2:]
+    X_df = d.iloc[:,1:]
     X = X_df.values
     Xmax, Xmin = X.max(axis=0), X.min(axis=0)
     X = (X - Xmin) / (Xmax - Xmin)

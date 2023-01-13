@@ -7,14 +7,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import Parameter
 from sklearn.cluster import KMeans
-from metrics import *
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 import pandas as pd
 import sys
 sys.path.append("..")
+from metrics import *
 from  preprocess import load_data
-from sklearn import metrics
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
