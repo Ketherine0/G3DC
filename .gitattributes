@@ -6,3 +6,5 @@ code/model_weight/Seg_weight/path/sim_autoencoder.pth filter=lfs diff=lfs merge=
 code/model_weight/Seg_weight/path/dec.pth filter=lfs diff=lfs merge=lfs -text
 code/model_weight/Baron_weight/path/sim_autoencoder.pth filter=lfs diff=lfs merge=lfs -text
 code/model_weight/Baron_weight/path/dec.pth filter=lfs diff=lfs merge=lfs -text
+code/model_weight/Xin_weight/path/dec.pth filter=lfs diff=lfs merge=lfs -text
+code/model_weight/Xin_weight/path/sim_autoencoder.pth filter=lfs diff=lfs merge=lfs -text
