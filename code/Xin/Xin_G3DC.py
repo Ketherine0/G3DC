@@ -1,14 +1,6 @@
 import os
-import csv
-import numpy as np
-import pandas
-import scipy.sparse as sp
-#import tensorflow.compat.v1 as tf
 import torch
 from sklearn import manifold, datasets
-from visdom import Visdom
-
-#tf.disable_v2_behavior()
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import Parameter
@@ -17,34 +9,27 @@ from metrics import *
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 import pandas as pd
-from singleCell import load_data
+import sys
+sys.path.append("..")
+from metrics import *
+from preprocess import load_data
 from sklearn import metrics
-#from sgd import SGD
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-
-# python test.py "example_expression.csv" "example_adjacency.txt" "var_impo.csv"
 
 class AutoEncoder(nn.Module):
     def __init__(self):
         super(AutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
             nn.Linear(1871, 1433),
-            # nn.BatchNorm1d(512),
             nn.ReLU(True),
             nn.Linear(1433, 125),
             nn.ReLU(True),
-            # nn.Linear(1000, 4000),
-            # nn.ReLU(True),
             nn.Linear(125, 4),
         )
         self.decoder = nn.Sequential(
             nn.Linear(4, 125),
             nn.ReLU(True),
-            # nn.BatchNorm1d(512),
-            # nn.Linear(4000, 1000),
-            # nn.ReLU(True),
             nn.Linear(125, 1433),
             nn.ReLU(True),
             nn.Linear(1433, 1871))
@@ -124,37 +109,16 @@ class MyLoss(nn.Module):
     def forward(self, W):
 
         L_norm = self.L.float()
-        # tr = trace(W, L)
-        # nrow = W.shape[0]
-        # L21_nrom = 0
-        # for i in range(nrow):
-        #     W2 = np.linalg.norm(W[i], ord=2, axis=None, keepdims=False)
-        #     L21_nrom += W2
-        # W: 800x1000
 
         tr = torch.trace(torch.mm(torch.mm(W, L_norm), torch.transpose(W, 0, 1)))
         print('tr loss',tr)
 
         W1 = torch.transpose(W, 0, 1)
         L21_norm = (torch.sqrt(torch.mul(W1, W1).sum(1))).sum()
-
-        # print(torch.sqrt(torch.mm(W, torch.transpose(W,0,1)).sum(1)))
-        # L21_norm = L21(W.data)
         print('L21 loss',L21_norm)
 
         loss_sum = self.l1*tr + self.l2*L21_norm
-        # loss_sum = self.l2*L21_norm
-        # np.savetxt("W_usoskin.txt", W.cpu().detach().numpy())
-        # loss_sum.backward()
-        # print('W grad',W.grad,W.grad_fn)
         return loss_sum
-
-
-def add_noise(img):
-    noise = torch.randn(img.size()) * 0.2
-    noisy_img = img + noise
-    return noisy_img
-
 
 def save_checkpoint(state, filename, is_best):
     """Save checkpoint if a new best is achieved"""
@@ -163,28 +127,6 @@ def save_checkpoint(state, filename, is_best):
         torch.save(state, filename)
     else:
         print("=> Validation Accuracy did not improve")
-
-
-def t_SNE(output, dimention):
-    # output:待降维的数据
-    # dimention：降低到的维度
-    tsne = manifold.TSNE(n_components=dimention, init='pca', random_state=0)
-    result = tsne.fit_transform(output)
-    return result
-
-# Visualization with visdom
-def Visualization(vis, result, labels,title):
-    # vis: Visdom对象
-    # result: 待显示的数据，这里为t_SNE()函数的输出
-    # label: 待显示数据的标签
-    # title: 标题
-    vis.scatter(
-        X = result,
-        Y = labels+1,           # 将label的最小值从0变为1，显示时label不可为0
-       opts=dict(markersize=4,title=title,markersymbol='cross-thin-open',
-                 layoutopts = {'plotly': {'xaxis': {'showgrid':False, 'showline':False, 'showticklabels':False}}}),
-    )
-
 
 def pretrain(**kwargs):
     data = kwargs['data']
@@ -202,14 +144,9 @@ def pretrain(**kwargs):
     for epoch in range(start_epoch, num_epochs):
         for data in train_loader:
             img = data.float()
-            noisy_img = add_noise(img)
-            noisy_img = noisy_img.to(device)
             img = img.to(device)
             # ===================forward=====================
-            output = model(noisy_img)
             output = model(img)
-            # output of target distribution
-            # print('tar',target)
             out = output.argmax(1)
 
             output = output.view(output.size(0), 1871)
@@ -262,31 +199,17 @@ def train(**kwargs):
     model.clusteringlayer.cluster_centers = torch.nn.Parameter(cluster_centers)
     # =========================================================
     y_pred = kmeans.predict(features.cpu())
-    # print(y)
-    # print(y_pred)
-    # accuracy = metrics.normalized_mutual_info_score(y.numpy(), y_pred)
-    # accuracy = acc(y.numpy(), y_pred)
     accuracy = metrics.normalized_mutual_info_score(y.numpy(), y_pred)
     print('Initial Accuracy: {}'.format(accuracy))
 
     lambda1 = torch.tensor(1e-5)
     lambda2 = torch.tensor(1e-2)
-    # loss_function = Reg_loss(size_average=False, l1=lambda1, l2=lambda2, l3=lambda3)
-    # loss_function = nn.KLDivLoss(size_average=False)
 
     W = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
 
     a = MyLoss(l1=lambda1, l2=lambda2, L=adj)
     loss_function = nn.KLDivLoss(size_average=False)
 
-    # model_param = model.parameters
-    # print('model para', model_param)
-
-    # para_dict = {{lambda1:lambda1}, {lambda2:lambda2}, model_param}
-    # print('para_dict:', para_dict)
-
-    # optimizer = torch.optim.SGD(params=model.parameters(), lr=1e-3, momentum=0.9, la1=lambda1, la2=lambda2)
-    # optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=1e-5)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9,weight_decay=1e-7)
 
     print('Training')
@@ -304,48 +227,30 @@ def train(**kwargs):
         loss_mse = nn.MSELoss()(reconst_output, img)
         if epoch % 10 == 0:
             W1 = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
-            np.savetxt('%s %s %s' % ('Xin_test_5_tsne2_W/W', epoch, '.txt'), W1.cpu().detach().numpy())
-        # output of target distribution
+            np.savetxt('%s %s %s' % ('../model_weight/Xin_weight/layer_weight/W', epoch, '.txt'), W1.cpu().detach().numpy())
         target = model.target_distribution(output).detach()
-        # print('tar',target)
         out = output.argmax(1)
-        # if epoch % 20 == 0:
-        #     print('plotting')
-        #     dec.visualize(epoch, img)
 
         ''' put weight '''
 
-        # W1 = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
-        # img: 100x500 (input)
-        # cluster_center =
-        # z: 100x200
-        # z.unsqueeze(1): 100x1x200
         z = []
         for i, batch in enumerate(train_loader):
             img = batch.float()
             img = img.to(device)
             z.append(model.autoencoder.encode(img).detach())
-        # z = torch.cat(z)
-        # mu = cluster_centers
-        # z = torch.tensor(z,requires_grad=True)
-        # mu = torch.tensor(mu,requires_grad=True)
         W1 = parameters[0]
         loss1 = a(W1)
-        # loss2 = loss_function(output.log(), target) / output.shape[0]
         loss2 = loss_function(torch.log(output), target)
-        gamma = 0.001
         gamma1 = 10*loss2/loss_mse
 
         loss = gamma1*loss_mse + loss2+loss1
         print('mse_loss',gamma1*loss_mse)
         print('div_origin loss',loss2)
 
-        # loss = loss_function(output.log(), target) / output.shape[0]
         ''' revise loss '''
 
         optimizer.zero_grad()
         loss.backward()
-        # print('loss grad',loss.grad)
         optimizer.step()
         accuracy = acc(y.cpu().numpy(), out.cpu().numpy())
         NMI = metrics.normalized_mutual_info_score(y.cpu().numpy(), out.cpu().numpy())
@@ -368,41 +273,10 @@ def train(**kwargs):
             is_best)
 
     df = pd.DataFrame(row, columns=['epochs', 'accuracy','NMI','ARI'])
-    df.to_csv('Xin_test_5_tsne2_W/log_acc.csv')
-
-#  Visualization
-    # python -m visdom.server
-    # http://localhost:8097/#
-    # output = output.detach().numpy()
-    # labels = labels.detach().numpy()
-    # preds = out.detach().numpy()
-
-    # Visualization with visdom
-    # vis = Visdom(env='pyGCN Visualization')
-    # if True:
-    #     vis = Visdom(env='iDEC SingleCell Visualization')
-    #
-    #     result_all_2d = t_SNE(features, 2)
-    #     Visualization(vis, result_all_2d, labels,
-    #                   title='[Output of Xin pancreas]\n Dimension reduction to %dD' % (
-    #                       result_all_2d.shape[1]))
-    #     result_all_3d = t_SNE(features, 3)
-    #     Visualization(vis, result_all_3d, labels,
-    #                   title='[Output of Xin pancreas]\n Dimension reduction to %dD' % (
-    #                       result_all_3d.shape[1]))
-    #
-    #     print('Finished')
-    fea_df = pd.DataFrame(features.numpy())
-    print(fea_df)
-    fea_df.to_csv('Xin_test_5_tsne2_W/feature.csv')
-
-
-
+    df.to_csv('../model_weight/GSE_weight/layer_weight/log_acc.csv')
 
 if __name__ == '__main__':
-    # n = 100  p = 500
     x, y, adj = load_data()
-    # print('adj',adj)
     x = torch.tensor(x)
     y = torch.tensor(y)
 
@@ -414,14 +288,14 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=1600, type=int)
     parser.add_argument('--pretrain_epochs', default=500, type=int)
     parser.add_argument('--train_epochs', default=50, type=int)
-    parser.add_argument('--save_dir', default='Xin_test_5_tsne2')
+    parser.add_argument('--save_dir', default='../model_weight/GSE_weight/path')
     args = parser.parse_args()
     print(args)
     epochs_pre = args.pretrain_epochs
     batch_size = args.batch_size
 
     autoencoder = AutoEncoder().to(device)
-    ae_save_path = 'Xin_test_5_tsne2/sim_autoencoder.pth'
+    ae_save_path = '../model_weight/GSE_weight/path/sim_autoencoder.pth'
 
     if os.path.isfile(ae_save_path):
         print('Loading {}'.format(ae_save_path))
@@ -435,7 +309,7 @@ if __name__ == '__main__':
         }
     pretrain(data=x, model=autoencoder, num_epochs=epochs_pre, savepath=ae_save_path, checkpoint=checkpoint)
 
-    dec_save_path = 'Xin_test_5_tsne2/dec.pth'
+    dec_save_path = '../model_weight/GSE_weight/path/dec.pth'
     dec = DEC(n_clusters=4, autoencoder=autoencoder, hidden=4, cluster_centers=None, alpha=1.0).to(device)
     if os.path.isfile(dec_save_path):
         print('Loading {}'.format(dec_save_path))

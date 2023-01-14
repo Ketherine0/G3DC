@@ -1,0 +1,261 @@
+---
+title: "Seg_GSEA"
+author: "heshuqing 119010096"
+date: "6/9/2022"
+output:
+     pdf_document:
+         latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(dplyr))
+suppressMessages(library(msigdb))
+suppressMessages(library(GSEABase))
+suppressMessages(library(BiocGenerics))
+```
+
+```{r}
+library(msigdb)
+library(fgsea)
+impor_all <- read.csv('Seg_impo.csv')[,2]
+# impor_gene <- read.csv('impor_GSEA5.csv')
+# impor_gene <- read.csv("impor_weight1.csv")[,2]
+impor_gene <- read.csv("impor_weight_all.csv")[,2]
+# impor_gene <- read.csv('Seg_impo_random2.csv')
+# impor_gene$weight <- -impor_gene$weight
+head(impor_gene)
+```
+```{r}
+msigdb.hs = getMsigdb(org = 'hs',id = c("SYM", "EZID"))
+# Downloading and integrating KEGG gene sets
+msigdb.hs = appendKEGG(msigdb.hs)
+length(msigdb.hs)
+```
+```{r}
+# listCollections(msigdb.hs)
+hallmarks = subsetCollection(msigdb.hs, 'c5')
+msigdb_ids <- geneIds(hallmarks)
+# class(msigdb_ids)
+```
+
+```{r}
+# GOstats
+library(GOstats)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+keytypes(org.Hs.eg.db)
+gene_symbol_all <- impor_all
+gene_symbol <- impor_gene
+gene_ids_all <- AnnotationDbi::select(org.Hs.eg.db, keys=as.character(gene_symbol_all),
+                                  column="ENTREZID",keytype="SYMBOL")
+gene_ids_impor <- AnnotationDbi::select(org.Hs.eg.db, keys=as.character(gene_symbol),
+                                  column="ENTREZID",keytype="SYMBOL")
+sel <- gene_ids_impor
+uni <- gene_ids_all
+# gene.df <- bitr(gene_symbol, fromType = "SYMBOL", #fromType是指你的数据ID类型是属于哪一类的
+#                 toType = c("ENTREZID"), #toType是指你要转换成哪种ID类型，可以写多种，也可以只写一种
+#                 OrgDb = org.Sc.sgd.db)
+params = new("GOHyperGParams",geneIds=sel,universeGeneIds=uni,annotation= "org.Hs.eg.db",ontology="BP",pvalueCutoff=0.01,conditional=F,testDirection="over")
+over = hyperGTest(params)
+b <- summary(over)
+```
+
+```{r}
+total <- list()
+impo <- data.frame(gene_ids_impor[,1])
+colnames(impo) <- c("gene_important")
+for (i in 1:dim(b)[1]){
+  a <- matrix(b[i,])
+  colnames(a) <- "GO"
+  gos <- b$GOBPID[i]
+  z <- mapIds(org.Hs.eg.db, gos, "SYMBOL", "GOALL", multiVals = "list")
+  z <- data.frame(z)
+  colnames(z) <- c("gene_important")
+  geneName <- intersect(x=z,y=impo)
+  colnames(geneName) <- "GO"
+  x<-rbind(a,geneName)
+  total[i]<-list(x)
+}
+
+total2 <- list()
+for (i in 1:length(total)){
+  total2[[i]]<-as.matrix(total[[i]])
+}
+df2<-do.call(cbind,lapply(lapply(total2,unlist),'length<-',max(lengths(total2))))
+write.csv(df2,"/Users/gypsophila/Desktop/RA/DEC_singleCell/Seg_Pancreas/GOTest_total_Seg2.csv")
+```
+```{r}
+# df1 <- read.csv("GOTest_total_usoskin3.csv")
+df1 <- df2
+# df2 <- df
+ind <- c()
+for (z in 2:dim(df1)[2]){
+  if (as.integer(df1[6,z])<=200){
+      if (!(z %in% ind)){
+          ind <- c(ind,z)
+      }
+  }
+}
+```
+```{r}
+df <- df1[,ind]
+index <- c()
+df_gene <- df[8:dim(df)[1],]
+for (i in 1:(dim(df)[2]-1)){
+  gene_li <- na.omit(df_gene[,i])
+  for (j in (i+1):dim(df)[2]){
+    gene_li2 <- na.omit(df_gene[,j])
+    inter <- intersect(gene_li,gene_li2)
+    big <- max(length(gene_li),length(gene_li2))
+    if (length(gene_li)==big){
+      if (length(inter)/length(gene_li)>=0.65){
+        # print(length(inter)/length(gene_li))
+         if (!(i %in% index)){
+            index <- c(index,i)
+        }
+      if (length(inter)/length(gene_li2)>=0.8){
+          if (!(j %in% index)){
+            index <- c(index,j)
+      }
+        }
+      }
+    }
+    else{
+      if (length(inter)/length(gene_li2)>=0.65){
+          if (!(j %in% index)){
+            index <- c(index,j)
+        }
+      if (length(inter)/length(gene_li)>=0.8){
+        if (!(j %in% index)){
+          index <- c(index,j)
+      }
+        }
+      }
+    }
+  }
+}
+```
+```{r}
+df_reduce <- df[,-index]
+write.csv(df_reduce,"GOTest_Seg_total_select0.csv")
+```
+
+## Ignore below
+```{r}
+# df1 <- read.csv("GOTest_total_Seg2.csv")
+# ind <- c()
+# for (z in 2:dim(df1)[2]){
+#   if (as.integer(df1[6,z])<200){
+#       if (!(z %in% ind)){
+#           ind <- c(ind,z)
+#       }
+#   }
+# }
+```
+```{r}
+df <- df1[,ind]
+index <- c()
+df_gene <- df[8:dim(df)[1],]
+for (i in 2:(dim(df)[2]-1)){
+  gene_li <- na.omit(df_gene[,i])
+  for (j in (i+1):dim(df)[2]){
+    gene_li2 <- na.omit(df_gene[,j])
+    inter <- intersect(gene_li,gene_li2)
+    big <- max(length(gene_li),length(gene_li2))
+    if (length(gene_li)==big){
+      if (length(inter)/length(gene_li)>=0.75){
+        # print(length(inter)/length(gene_li))
+         if (!(i %in% index)){
+            index <- c(index,i)
+        }
+      else if (length(inter)/length(gene_li2)>=0.9){
+          if (!(j %in% index)){
+            index <- c(index,j)
+      }
+        }
+      }
+    }
+    else{
+      if (length(inter)/length(gene_li2)>=0.75){
+          if (!(j %in% index)){
+            index <- c(index,j)
+        }
+      else if (length(inter)/length(gene_li)>=0.9){
+        if (!(j %in% index)){
+          index <- c(index,j)
+      }
+        }
+      }
+    }
+  }
+}
+
+```
+```{r}
+# write.csv(df,"/Users/gypsophila/Desktop/RA/DEC_singleCell/Seg_Pancreas/GOTest_Seg_total.csv")
+# df <- read.csv("GOTest_Seg_total.csv")
+```
+
+```{r}
+df_reduce <- df[,-index]
+write.csv(df_reduce,"/Users/gypsophila/Desktop/RA/DEC_singleCell/Seg_Pancreas/GOTest_Seg_total_select2.csv")
+```
+
+```{r}
+# df1 <- read.csv("/Users/gypsophila/Desktop/RA/DEC_singleCell/Data/SingleCellData/GOTest_Seg_select.csv")
+# ind <- c()
+# for (z in 2:dim(df1)[2]){
+#   if (as.integer(df1[6,z])<=200){
+#       if (!(z %in% ind)){
+#           ind <- c(ind,z)
+#       }
+#   }
+# }
+```
+```{r}
+# df <- df1[,ind]
+# index <- c()
+# df_gene <- df[8:dim(df)[1],]
+# for (i in 2:(dim(df)[2]-1)){
+# # for (i in c(12)){
+#   gene_li <- na.omit(df_gene[,i])
+#   for (j in (i+1):dim(df)[2]){
+#   # for (j in c(23)){
+#     gene_li2 <- na.omit(df_gene[,j])
+#     inter <- intersect(gene_li,gene_li2)
+#     # print(inter)
+#     big <- max(length(gene_li),length(gene_li2))
+#     # print(length(inter)/length(gene_li2))
+#     if (length(gene_li)==big){
+#       if (length(inter)/length(gene_li2)>=0.9){
+#           if (!(j %in% index)){
+#             index <- c(index,j)
+#       }
+#       else if (length(inter)/length(gene_li)>=0.75){
+#         # print(length(inter)/length(gene_li))
+#          if (!(i %in% index)){
+#             index <- c(index,i)
+#         }
+#         }
+#       }
+#     }
+#     else{
+#        if (length(inter)/length(gene_li)>=0.9){
+#         if (!(j %in% index)){
+#           index <- c(index,j)
+#         }
+#         else if (length(inter)/length(gene_li2)>=0.75){
+#           if (!(j %in% index)){
+#             index <- c(index,j)
+#         }
+#         }
+#       }
+#     }
+#   }
+# }
+```
+```{r}
+df_reduce <- df[,-index]
+write.csv(df_reduce,"GOTest_Seg_select1.csv")
+```

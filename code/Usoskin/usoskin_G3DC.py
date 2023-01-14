@@ -7,8 +7,6 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import Parameter
 from sklearn.cluster import KMeans
-from sklearn.manifold import TSNE
-from matplotlib import pyplot as plt
 import pandas as pd
 import sys
 sys.path.append("..")
@@ -280,7 +278,7 @@ def train(**kwargs):
             is_best)
 
     df = pd.DataFrame(row, columns=['epochs', 'accuracy','NMI','ARI'])
-    df.to_csv('../model_weight/usoskin_weight/path/log_acc.csv')
+    df.to_csv('../model_weight/usoskin_weight/layer_weight/log_acc.csv')
 
 
 
@@ -306,7 +304,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
 
     autoencoder = AutoEncoder().to(device)
-    ae_save_path = '../model_weight/usoskin_weight/path/sim_autoencoder3.pth'
+    ae_save_path = '../model_weight/usoskin_weight/path/sim_autoencoder.pth'
 
     if os.path.isfile(ae_save_path):
         print('Loading {}'.format(ae_save_path))
@@ -320,7 +318,7 @@ if __name__ == '__main__':
         }
     pretrain(data=x, model=autoencoder, num_epochs=epochs_pre, savepath=ae_save_path, checkpoint=checkpoint)
 
-    dec_save_path = '../model_weight/usoskin_weight/path/dec6.pth'
+    dec_save_path = '../model_weight/usoskin_weight/path/dec.pth'
     dec = DEC(n_clusters=4, autoencoder=autoencoder, hidden=64, cluster_centers=None, alpha=1.0).to(device)
     if os.path.isfile(dec_save_path):
         print('Loading {}'.format(dec_save_path))

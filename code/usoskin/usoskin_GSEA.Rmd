@@ -1,0 +1,131 @@
+---
+title: "usoskin_GSEA"
+author: "heshuqing 119010096"
+date: "6/9/2022"
+output:
+     pdf_document:
+         latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+# suppressMessages(library(dplyr))
+# suppressMessages(library(msigdb))
+# suppressMessages(library(GSEABase))
+# suppressMessages(library(BiocGenerics))
+```
+
+```{r}
+library(msigdb)
+library(fgsea)
+# impor_gene <- read.csv('/Users/gypsophila/Desktop/RA/DEC_singleCell/impor_weight_connected3.csv')$gene_name1
+impor_gene <- read.csv('/Users/gypsophila/Desktop/RA/DEC_singleCell/impor_weight_all4_f.csv')$gene_name
+# impor_gene$weight <- -impor_gene$weight
+impor_all <- read.csv('/Users/gypsophila/Desktop/RA/DEC_singleCell/usoskin_x.csv')[,1]
+head(impor_all)
+```
+
+```{r}
+# GOstats
+library(org.Mm.eg.db)
+library(GOstats)
+library(clusterProfiler)
+keytypes(org.Mm.eg.db)
+gene_symbol_all <- impor_all
+gene_symbol <- impor_gene
+gene_ids_all <- AnnotationDbi::select(org.Mm.eg.db, keys=as.character(gene_symbol_all),
+                                  column="ENTREZID",keytype="SYMBOL")
+gene_ids_impor <- AnnotationDbi::select(org.Mm.eg.db, keys=as.character(gene_symbol),
+                                  column="ENTREZID",keytype="SYMBOL")
+sel <- gene_ids_impor
+uni <- gene_ids_all
+# gene.df <- bitr(gene_symbol, fromType = "SYMBOL", #fromType是指你的数据ID类型是属于哪一类的
+#                 toType = c("ENTREZID"), #toType是指你要转换成哪种ID类型，可以写多种，也可以只写一种
+#                 OrgDb = org.Sc.sgd.db)
+params = new("GOHyperGParams",geneIds=sel,universeGeneIds=uni,annotation= "org.Mm.eg.db",ontology="BP",pvalueCutoff=0.01,conditional=F,testDirection="over")
+over = hyperGTest(params)
+
+b <- summary(over)
+# write.csv(b,"GOstats_usoskin.csv")
+```
+
+```{r}
+library(org.Mm.eg.db)
+total <- list()
+impo <- data.frame(gene_ids_impor[,1])
+colnames(impo) <- c("gene_important")
+for (i in 1:dim(b)[1]){
+  a <- matrix(b[i,])
+  colnames(a) <- "GO"
+  gos <- b$GOBPID[i]
+  z <- mapIds(org.Mm.eg.db, gos, "SYMBOL", "GOALL", multiVals = "list")
+  z <- data.frame(z)
+  colnames(z) <- c("gene_important")
+  geneName <- data.frame(intersect(x=z$gene_important,y=impo$gene_important))
+  colnames(geneName) <- "GO"
+  x<-rbind(a,geneName)
+  total[i]<-list(x)
+}
+total2 <- list()
+for (i in 1:length(total)){
+  total2[[i]]<-as.matrix(total[[i]])
+}
+df2<-do.call(cbind,lapply(lapply(total2,unlist),'length<-',max(lengths(total2))))
+# write.csv(df2,"/Users/gypsophila/Desktop/RA/DEC_singleCell/GOTest_total_usoskin3.csv")
+```
+
+```{r}
+# df1 <- read.csv("GOTest_total_usoskin3.csv")
+df1 <- df2
+ind <- c()
+for (z in 2:dim(df1)[2]){
+  if (as.integer(df1[6,z])<=200){
+      if (!(z %in% ind)){
+          ind <- c(ind,z)
+      }
+  }
+}
+```
+```{r}
+df <- df1[,ind]
+index <- c()
+df_gene <- df[8:dim(df)[1],]
+for (i in 2:(dim(df)[2]-1)){
+  gene_li <- na.omit(df_gene[,i])
+  for (j in (i+1):dim(df)[2]){
+    gene_li2 <- na.omit(df_gene[,j])
+    inter <- intersect(gene_li,gene_li2)
+    big <- max(length(gene_li),length(gene_li2))
+    if (length(gene_li)==big){
+      if (length(inter)/length(gene_li)>=0.75){
+        # print(length(inter)/length(gene_li))
+         if (!(i %in% index)){
+            index <- c(index,i)
+        }
+      else if (length(inter)/length(gene_li2)>=0.9){
+          if (!(j %in% index)){
+            index <- c(index,j)
+      }
+        }
+      }
+    }
+    else{
+      if (length(inter)/length(gene_li2)>=0.75){
+          if (!(j %in% index)){
+            index <- c(index,j)
+        }
+      else if (length(inter)/length(gene_li)>=0.9){
+        if (!(j %in% index)){
+          index <- c(index,j)
+      }
+        }
+      }
+    }
+  }
+}
+```
+```{r}
+df_reduce <- df[,-index]
+# write.csv(df_reduce,"GOTest_usoskin_total_select3.csv")
+```
+

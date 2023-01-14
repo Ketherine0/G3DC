@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
-import csv
-import numpy as np
-#import tensorflow.compat.v1 as tf
 import torch
-from sklearn import manifold
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import Parameter
 from sklearn.cluster import KMeans
-
+from sklearn import metrics
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 import pandas as pd
@@ -211,32 +207,19 @@ def train(**kwargs):
     model.clusteringlayer.cluster_centers = torch.nn.Parameter(cluster_centers)
     # =========================================================
     y_pred = kmeans.predict(features.cpu())
-    # print(y)
-    # print(y_pred)
     accuracy = acc(y.numpy(), y_pred)
     print('Initial Accuracy: {}'.format(accuracy))
 
     lambda1 = torch.tensor(1e-3)
     lambda2 = torch.tensor(1e-3)
-    # loss_function = Reg_loss(size_average=False, l1=lambda1, l2=lambda2, l3=lambda3)
-    # loss_function = nn.KLDivLoss(size_average=False)
 
     W = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
 
     a = MyLoss(l1=lambda1, l2=lambda2, L=adj)
     loss_function = nn.KLDivLoss(size_average=False)
 
-    # model_param = model.parameters
-    # print('model para', model_param)
-
-    # para_dict = {{lambda1:lambda1}, {lambda2:lambda2}, model_param}
-    # print('para_dict:', para_dict)s
-
-    # optimizer = torch.optim.SGD(params=model.parameters(), lr=0.1, momentum=0.9, la1=lambda1, la2=lambda2)
-    # optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=1e-5)
     optimizer1 = torch.optim.Adam(params=model.parameters(), lr=1e-4, weight_decay=1e-5)
     optimizer2 = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=1e-5)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, momentum=0.99,weight_decay=1e-7)
 
     print('Training')
     row = []
@@ -254,34 +237,20 @@ def train(**kwargs):
 
         if epoch % 10 == 0:
             W1 = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
-            np.savetxt('%s %s %s' % ('ver6_tsne3_W/W', epoch, '.txt'), W1.cpu().detach().numpy())
+            np.savetxt('%s %s %s' % ('../model_weight/Seg_weight/layer_weight/W', epoch, '.txt'), W1.cpu().detach().numpy())
         # output of target distribution
         target = model.target_distribution(output).detach()
-        # print('tar',target)
         out = output.argmax(1)
-        # if epoch % 20 == 0:
-        #     print('plotting')
-        #     dec.visualize(epoch, img)
 
         ''' put weight '''
 
-        # W1 = torch.tensor(parameters[0].detach().numpy(), requires_grad=True)
-        # img: 100x500 (input)
-        # cluster_center =
-        # z: 100x200
-        # z.unsqueeze(1): 100x1x200
         z = []
         for i, batch in enumerate(train_loader):
             img = batch.float()
             img = img.to(device)
             z.append(model.autoencoder.encode(img).detach())
-        # z = torch.cat(z)
-        # mu = cluster_centers
-        # z = torch.tensor(z,requires_grad=True)
-        # mu = torch.tensor(mu,requires_grad=True)
         W1 = parameters[0]
         loss1 = a(W1)
-        # loss2 = loss_function(output.log(), target) / output.shape[0]
         loss2 = loss_function(torch.log(output), target)
 
         gamma1 = 0.01
@@ -290,23 +259,10 @@ def train(**kwargs):
         print('mse_loss',gamma1*loss_mse)
         print('div_origin loss',loss2)
 
-
-        # loss = loss_function(output.log(), target) / output.shape[0]
-        ''' revise loss '''
-        # if epoch<=49:
-        #     optimizer = optimizer1
-        # else:
-        #     optimizer = optimizer2
-
-        # if epoch <= 160:
-        #     optimizer = optimizer1
-        # else:
-        #     optimizer = optimizer2
         optimizer = optimizer2
 
         optimizer.zero_grad()
         loss.backward()
-        # print('loss grad',loss.grad)
         optimizer.step()
 
         accuracy = acc(y.cpu().numpy(), out.cpu().numpy())
@@ -331,32 +287,7 @@ def train(**kwargs):
             is_best)
 
     df = pd.DataFrame(row, columns=['epochs', 'accuracy','NMI','ARI'])
-    df.to_csv('ver6_tsne3_W/log_acc.csv')
-
-#  Visualization
-    # python -m visdom.server
-    # http://localhost:8097/#
-    # output = output.detach().numpy()
-    # labels = labels.detach().numpy()
-    # preds = out.detach().numpy()
-
-    # Visualization with visdom
-    # if True:
-    #     vis = Visdom(env='iDEC SingleCell Visualization')
-    #
-    #     result_all_2d = t_SNE(features, 2)
-    #     Visualization(vis, result_all_2d, labels,
-    #                   title='[Output of Baron]\n Dimension reduction to %dD' % (
-    #                       result_all_2d.shape[1]))
-    #     result_all_3d = t_SNE(features, 3)
-    #     Visualization(vis, result_all_3d, labels,
-    #                   title='[Output of Baron]\n Dimension reduction to %dD' % (
-    #                       result_all_3d.shape[1]))
-    #
-    #     print('Finished')
-    fea_df = pd.DataFrame(features.numpy())
-    print(fea_df)
-    fea_df.to_csv('ver6_tsne3_W/feature.csv')
+    df.to_csv('../model_weight/Baron_weight/layer_weight/log_acc.csv')
 
 
 
@@ -384,7 +315,7 @@ if __name__ == '__main__':
 
 
     autoencoder = AutoEncoder().to(device)
-    ae_save_path = 'ver6_tsne3/sim_autoencoder2.pth'
+    ae_save_path = '../model_weight/Seg_weight/path/sim_autoencoder.pth'
 
     if os.path.isfile(ae_save_path):
         print('Loading {}'.format(ae_save_path))
@@ -398,7 +329,7 @@ if __name__ == '__main__':
         }
     pretrain(data=x, model=autoencoder, num_epochs=epochs_pre, savepath=ae_save_path, checkpoint=checkpoint)
 
-    dec_save_path = 'ver6_tsne3/dec2.pth'
+    dec_save_path = '../model_weight/Seg_weight/path/dec.pth'
     dec = DEC(n_clusters=6, autoencoder=autoencoder, hidden=70, cluster_centers=None, alpha=1.0).to(device)
     if os.path.isfile(dec_save_path):
         print('Loading {}'.format(dec_save_path))
