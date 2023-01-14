@@ -1,1 +1,2 @@
 scRNA_seq_data/GSE_x.csv filter=lfs diff=lfs merge=lfs -text
+.pth filter=lfs diff=lfs merge=lfs -text
